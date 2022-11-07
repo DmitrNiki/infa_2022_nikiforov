@@ -57,14 +57,17 @@ finished = False
 
 while not finished:
     clock.tick(FPS)
-
+    flag = 0
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             finished = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if isCaught(event, ball1.get_x(), ball1.get_y(), ball1.get_r()) or isCaught(event, ball2.get_x(),
-                                                                                        ball2.get_y(), ball2.get_r()):
+            if flag == 0 and (isCaught(event, ball1.get_x(), ball1.get_y(), ball1.get_r()) or isCaught(event, ball2.get_x(),
+                                                                                        ball2.get_y(), ball2.get_r())):
                 counter += 1
+                flag = 1
+
+
 
 
     text_surface = my_font.render(f'COUNTER: {counter}', False, (255, 255, 255))
