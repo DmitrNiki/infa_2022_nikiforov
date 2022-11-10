@@ -31,7 +31,7 @@ class Ball:
         self.screen = screen
         self.x = x
         self.y = y
-        self.radius = 10
+        self.radius = 9
         self.vx = 0
         self.vy = 0
         self.color = choice(GAME_COLORS)
