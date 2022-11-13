@@ -2,6 +2,7 @@ import math
 import numpy as np
 from random import choice, randint
 import pygame
+import time
 
 pygame.init()
 FPS = 30
@@ -22,13 +23,14 @@ HEIGHT = 600
 
 my_font = pygame.font.SysFont('Comic Sans MS', 30)
 trace = ([])
+fl = 1
 def draw_point(m, col, screen):
     for [i, j] in m:
         pygame.draw.circle(
             screen,
             col,
             (i, j),
-            3
+            1
         )
 
 def dist(x1, y1, x2, y2):
@@ -50,21 +52,57 @@ class Ball:
         self.vy = 0
         self.color = choice(GAME_COLORS)
         self.live = 30
+        self.trace = trace
+
+    def change_v(self):
+        '''
+        Функция меняет скорость у шарика
+        в зависимости от его положения(с какой именно стеной он столкнулся)
+        '''
+        k = 0.7
+        if (self.x < self.radius + 10) and (self.y < self.radius + 10):
+            self.vx = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+            self.vy = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+        elif (self.x > WIDTH - self.radius - 10) and (self.y > HEIGHT - self.radius - 10):
+            self.vx = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+            self.vy = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+        elif (self.x < self.radius + 10) and (self.y > HEIGHT - self.radius - 10):
+            self.vx = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+            self.vy = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+        elif (self.x > WIDTH - self.radius - 10) and (self.y < self.radius + 10):
+            self.vx = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+            self.vy = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
+        elif (self.x < self.radius + 10) or (self.x > WIDTH - self.radius - 10):
+            self.vx = -k * self.vx
+            self.vy *= k
+        elif (self.y < self.radius + 10) or (self.y > HEIGHT - self.radius - 10):
+            self.vy = -k * self.vy
+            self.vx *= k
+
+    def is_stop(self):
+        """Проверяет не остановился лт шарик"""
+        return self.vx ** 2 + self.vy ** 2 < 1
 
 
     def move(self):
         """Переместить мяч по прошествии единицы времени.
-
         Метод описывает перемещение мяча за один кадр перерисовки. То есть, обновляет значения
         self.x и self.y с учетом скоростей self.vx и self.vy, силы гравитации, действующей на мяч,
         и стен по краям окна (размер окна 800х600).
         """
         g = 1
-        trace.append([self.x, self.y])
-        self.x += self.vx
-        self.vy += g
-        self.y += self.vy
+
+        self.trace.append([self.x, self.y])
         draw_point(trace, self.color, self.screen)
+        if not self.is_stop():
+            self.x += self.vx
+            self.vy += g
+            self.y += self.vy
+            if self.isCol():
+                self.fix_position()
+                self.change_v()
+        else:
+            self.fix_position()
 
     def draw(self):
         pygame.draw.circle(
@@ -85,14 +123,35 @@ class Ball:
         d = dist(self.x, self.y, obj.x, obj.y)
         if d <= 1.2*(self.radius + obj.radius):
             return True
-        """elif (self.x - self.radius - obj.radius > obj.x) and (self.x - self.radius - obj.radius > obj.y):
-            a = obj.finder(trace)[0]
-            m1 = obj.finder(trace)[1]
-            n = abs(a[1] * obj.x - a[0] * obj.y - a[1] * m1[0] + a[0] * m1[1]) / (math.sqrt(a[1] ** 2 + a[0] ** 2))
-            if n <= (self.radius + obj.radius):
-                return True"""
         else:
             return False
+
+    def isCol(self):
+        """Функция проверяет, сталкивалкивается ли шарик со стеной.
+        Returns:
+            Возвращает True в случае столкновения мяча и стены. В противном случае возвращает False.
+        """
+        delta = 1
+        if (self.y > self.radius + delta) and (self.y < HEIGHT - self.radius - delta) and (self.x > self.radius + delta) and (
+                self.x < WIDTH - self.radius - delta):
+            return False
+        else:
+            return True
+
+    def fix_position(self):
+        '''
+        Исправляет позицию шарика при коллизии,
+        чтобы избежать проблем, связанных в краевыми эффектами
+        '''
+        delta1 = 5
+        if self.x < delta1 + self.radius:
+            self.x = delta1 + self.radius
+        if self.x > WIDTH - self.radius - delta1:
+            self.x = WIDTH - self.radius - delta1
+        if self.y < delta1 + self.radius:
+            self.y = delta1 + self.radius
+        if self.y > HEIGHT - self.radius - delta1:
+            self.y = HEIGHT - self.radius - delta1
 
 
 def rot(an, p0, p1):
@@ -190,16 +249,6 @@ class Target:
         """Попадание шарика в цель."""
         self.points += points
 
-    def finder(self, m):
-        min1 = [0, 0]
-        min2 = [1, 1]
-        for [i, j] in m:
-            if dist(i, j, self.x, self.y) < dist(min1[0], min1[1], self.x, self.y):
-                min2 = min1
-                min1 = [i, j]
-        a = [min1[0] - min2[0], min1[1] - min2[1]]
-        return [a, min1, min2]
-
     def draw(self):
         pygame.draw.circle(
             self.screen,
@@ -213,9 +262,12 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 balls = []
-
 list_of_motions = []
+
 clock = pygame.time.Clock()
+t11 = 0
+t2 = 0
+flag1 = 0
 gun = Gun(screen)
 target = Target(screen)
 finished = False
@@ -232,14 +284,15 @@ while not finished:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             finished = True
-        elif event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.MOUSEBUTTONDOWN and fl != 0:
             gun.fire2_start(event)
             trace = ([])
+            Ball.trace = ([])
 
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == pygame.MOUSEBUTTONUP and fl != 0:
             gun.fire2_end(event)
             bullet += 1
-        elif event.type == pygame.MOUSEMOTION:
+        elif event.type == pygame.MOUSEMOTION and fl != 0:
             gun.targetting(event)
             list_of_motions.append(event)
 
@@ -253,11 +306,23 @@ while not finished:
         b.move()
         if b.hittest(target) and target.live:
             target.live = 0
+            t11 = time.time()
             target.hit()
             target.new_target()
+            flag1 = 0
+
+    t2 = time.time()
+
+    if t2 - t11 <= 2:
+        screen.blit(text_surface1, (100, HEIGHT // 3))
+        fl = 0
+    elif flag1 == 0:
+        bullet = 0
+        balls = []
+        flag1 = 1
+        fl = 1
     screen.blit(text_surface2, (50, 50))
     pygame.display.update()
     gun.power_up()
 
 pygame.quit()
-
